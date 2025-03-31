@@ -6,6 +6,8 @@ const path = require("path");
 const cors = require("cors");
 const { ethers } = require("ethers");
 const mongoose = require("mongoose");
+const axios = require("axios");
+const FormData = require("form-data");
 
 // Initialize Express app
 const app = express();
@@ -21,6 +23,7 @@ mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 });
+
 const Document = mongoose.model("Document", {
     fileName: String,
     contractAddress: String,
@@ -33,6 +36,7 @@ const uploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, uploadDir);
@@ -41,11 +45,36 @@ const storage = multer.diskStorage({
         cb(null, file.originalname);
     },
 });
+
 const upload = multer({ storage });
 
-// Initialize ethers provider (without ENS settings)
+// Initialize ethers provider
 const provider = new ethers.JsonRpcProvider(process.env.API_URL);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+// Function to upload file to Pinata IPFS
+const uploadToIPFS = async (filePath, fileName) => {
+    const url = `https://api.pinata.cloud/pinning/pinFileToIPFS`;
+    const fileStream = fs.createReadStream(filePath);
+    
+    const formData = new FormData();
+    formData.append("file", fileStream, { filename: fileName });
+
+    try {
+        const response = await axios.post(url, formData, {
+            headers: {
+                ...formData.getHeaders(),
+                pinata_api_key: process.env.PINATA_API_KEY,
+                pinata_secret_api_key: process.env.PINATA_SECRET_API_KEY,
+            },
+        });
+
+        return response.data.IpfsHash; // ✅ Returns the actual IPFS CID
+    } catch (error) {
+        console.error("IPFS Upload Error:", error.response?.data || error.message);
+        throw new Error("Failed to upload to IPFS");
+    }
+};
 
 // Upload file endpoint
 app.post("/upload", upload.single("file"), async (req, res) => {
@@ -54,6 +83,9 @@ app.post("/upload", upload.single("file"), async (req, res) => {
             return res.status(400).json({ error: "No file uploaded" });
         }
 
+        // Upload file to IPFS
+        const ipfsHash = await uploadToIPFS(req.file.path, req.file.filename);
+
         // Simulate contract deployment and getting contract address
         const contractAddress = ethers.Wallet.createRandom().address;
 
@@ -61,7 +93,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         const document = new Document({
             fileName: req.file.filename,
             contractAddress,
-            ipfsHash: "QDDWMdwd", // Replace with real IPFS hash
+            ipfsHash,
             owner: wallet.address,
         });
 
@@ -70,6 +102,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
             message: "File uploaded successfully",
             contractAddress,
             fileName: req.file.filename,
+            ipfsHash,
         });
     } catch (error) {
         console.error("Upload error:", error);

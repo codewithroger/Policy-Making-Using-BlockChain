@@ -14,10 +14,12 @@
     "@nomiclabs/hardhat-ethers": "^2.0.6",
     "curl": "^0.1.4",
     "express-fileupload": "^1.4.0",
+    "form-data": "^4.0.2",
     "ipfs-http-client": "^50.1.2",
     "mongoose": "^8.13.1",
     "multer": "^1.4.5-lts.2",
-    "path": "^0.12.7"
+    "path": "^0.12.7",
+    "web3.storage": "^4.5.5"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^3.0.8",
