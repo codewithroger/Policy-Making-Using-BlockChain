@@ -86,7 +86,6 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         // Upload file to IPFS
         const ipfsHash = await uploadToIPFS(req.file.path, req.file.filename);
 
-        // Simulate contract deployment and getting contract address
         const contractAddress = ethers.Wallet.createRandom().address;
 
         // Save document metadata to MongoDB
